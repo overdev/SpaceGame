@@ -2,7 +2,7 @@ __author__ = 'Jorge'
 
 
 import pygame
-import types
+import pygame.locals as c
 from .core import resource
 from .geometry import Vec
 
@@ -98,37 +98,133 @@ class BitmapFont(object):
             x += gw
 
 
-def event(func):
-    """Function decorator for Listener events"""
-    if isinstance(func, types.MethodType):
-        cls = func.__self__.__class__
-        if issubclass(cls, Listener):
-            name = func.__name__
-            cls.handlers[name] = func
-        else:
-            print("'event' decorator not in Listener subclass")
-    else:
-        print("instance method expected.")
+class UIElement(object):
 
+    @classmethod
+    def get_command(cls, event) -> tuple or None:
+        if event.type == c.KEYDOWN:
+            ctrl = event.mod & c.KMOD_LCTRL or event.mod & c.KMOD_RCTRL
+            alt = event.mod & c.KMOD_LALT or event.mod & c.KMOD_RALT
+            shift = event.mod & c.KMOD_LSHIFT or event.mod & c.KMOD_RSHIFT
 
-class Listener(object):
+            if ctrl:
+                if alt:
+                    return c.K_LCTRL, c.K_LALT, event.key
+                elif shift:
+                    return c.K_LCTRL, c.K_LSHIFT, event.key
+                else:
+                    return c.K_LCTRL, event.key
+            elif alt:
+                if shift:
+                    return c.K_LALT, c.K_LSHIFT, event.key
+                else:
+                    return c.K_LALT, event.key
+            elif shift:
+                return c.K_LSHIFT, event.key
+            else:
+                return event.key
 
-    """A basic event listener.
+        return None
 
-    Calls handler functions based on events triggered."""
+    def __init__(self, position, size):
+        self.pos = Vec(*position)
+        self.size = Vec(*size)
+        self.label = "uielmt"
+        self.icon = None
+        self.command = None
+        self.active = True
+        self.visible = True
 
-    handlers = {}
+    def contains_point(self, point) -> bool:
+        """Returns whether the given point is inside this object's bounds."""
+        return (self.pos.x <= point[0] <= self.pos.x + self.size.x and
+                self.pos.y <= point[1] <= self.pos.y + self.size.y and
+                self.visible)
 
-    def __getattr__(self, name):
-        if name in self.__class__.handlers:
-            return self.__class__.handlers[name]
-        else:
-            msg = "{} object has no attribute '{}'.".format(self.__class__, name)
-            raise AttributeError(msg)
+    def inner_point(self, point) -> Vec:
+        """Returns a point relative to this object's position."""
+        return self.pos - point
 
+    def responds_to(self, command) -> bool:
+        """Returns whether this object will respond to keyboard input."""
+        return command == self.command and self.active is True and self.command is not None
 
-class Test(Listener):
-
-    @event
-    def on_event(self):
+    def on_left_click(self, client) -> None:
+        """Called when the left mouse button is pressed over this object."""
         pass
+
+    def on_right_click(self, client) -> None:
+        """Called when the right mouse button is pressed over this object."""
+        pass
+
+    def on_middle_click(self, client) -> None:
+        """Called when the middle mouse button is pressed over this object."""
+        pass
+
+    def on_client_enter(self, client) -> None:
+        """Called when the mouse moves in this object."""
+        pass
+
+    def on_client_move(self, client) -> None:
+        """Called when the mouse moves over this object."""
+        pass
+
+    def on_client_exit(self, client) -> None:
+        """Called when the mouse moves out this object."""
+        pass
+
+    def on_roll_up(self, client) -> None:
+        """Called when the mouse wheel rolls up over this object."""
+        pass
+
+    def on_roll_down(self, client) -> None:
+        """Called when the mouse wheel rolls down over this object."""
+        pass
+
+    def on_command(self) -> None:
+        """Called when the this object's keyboard command is entered."""
+        pass
+
+
+class Dispatcher(object):
+
+    def __init__(self, listeners):
+        self.listeners = []
+        self._mouse_listeners = []
+        for listener in listeners:
+            self.listeners.append(listener)
+
+    def process_events(self, events) -> None:
+
+        for event in events:
+            if event.type == c.KEYDOWN:
+                cmd = UIElement.get_command(event)
+                for listener in self.listeners:
+                    if listener.responds_to(cmd):
+                        listener.on_command()
+
+            elif event.type == c.MOUSEMOTION:
+                for listener in self.listeners:
+                    if listener.contains_point(event.pos):
+                        if listener in self._mouse_listeners:
+                            listener.on_client_move(listener.inner_point(event.pos))
+                        else:
+                            listener.on_client_enter()
+                            self._mouse_listeners.append(listener)
+                    else:
+                        if listener in self._mouse_listeners:
+                            listener.on_clent_exit()
+                            self._mouse_listeners.remove(listener)
+
+            elif event.type == c.MOUSEBUTTONDOWN:
+                for listener in self._mouse_listeners:
+                    if event.button == 1:
+                        listener.on_left_click(listener.inner_point(event.pos))
+                    elif event.button == 2:
+                        listener.on_middle_click(listener.inner_point(event.pos))
+                    elif event.button == 3:
+                        listener.on_right_click(listener.inner_point(event.pos))
+                    elif event.button == 4:
+                        listener.on_roll_up(listener.inner_point(event.pos))
+                    elif event.button == 5:
+                        listener.on_roll_down(listener.inner_point(event.pos))
