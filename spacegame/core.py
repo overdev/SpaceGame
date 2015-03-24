@@ -43,6 +43,11 @@ class Scene(object):
     stuff on the screen."""
 
     @classmethod
+    def goto(cls, scene) -> None:
+        """Sets the next scene to be played."""
+        Game.scene = scene
+
+    @classmethod
     def play(cls) -> None:
         """Runs the game under this specific logic.
 

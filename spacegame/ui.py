@@ -1,6 +1,7 @@
 __author__ = 'Jorge'
 
 
+from enum import Enum
 import pygame
 import pygame.locals as c
 from .core import resource
@@ -8,7 +9,12 @@ from .geometry import Vec
 
 __all__ = [
     "BitmapFont",
-    "blend_color"
+    "blend_color",
+    "Anchor",
+    "UIElement",
+    "Button",
+    "Switcher",
+    "List"
 ]
 
 # BmpFont constants
@@ -20,6 +26,19 @@ GRD = 4     # the tile grid size (w, h)
 GLY = 5     # the glyph position and size in the tile region (x, y, w, h)
 CHR = 6     # the characters contained in the font (a string)
 BFC = 7     # the current background and foreground colors wich the surface palette was blended into
+
+
+# Font alignment constants
+class Anchor(Enum):
+    top_left = 1
+    top = 2
+    top_right = 3
+    middle_left = 4
+    middle = 5
+    middle_right = 6
+    bottom_left = 7
+    bottom = 8
+    bottom_right = 9
 
 
 def normalize_color(color) -> tuple:
@@ -75,9 +94,33 @@ class BitmapFont(object):
         return font[BFC]
 
     @classmethod
-    def render(cls, surface, text, font, position, blend=0) -> None:
-        """Renders the given text str with the given font at the given position."""
+    def measure(cls, text, font, position, anchor=Anchor.top_left) -> tuple:
+        """Returns a (x, y, w, h) tuple reflecting the text bounds"""
         x, y = position
+        w = font[GLY][2] * len(text)
+        h = font[GLY][3]
+
+        # faster and prettier than if/elif chains
+        rct = {
+            Anchor.top_left: (x, y, w, h),
+            Anchor.top: (x - (w / 2), y, w, h),
+            Anchor.top_right:  (x - (w / 2), y - h, w, h),
+            Anchor.middle_left: (x, y - (h / 2), w, h),
+            Anchor.middle: (x - (w / 2), y - (h / 2), w, h),
+            Anchor.middle_right: (x - w, y - (h / 2), w, h),
+            Anchor.bottom_left: (x, y - h, w, h),
+            Anchor.bottom: (x - (w / 2), y - h, w, h),
+            Anchor.bottom_right: (x - w, y - h, w, h)
+        }
+
+        if anchor in rct:
+            return rct[anchor]
+        return rct[Anchor.top_left]
+
+    @classmethod
+    def render(cls, surface, text, font, position, anchor=Anchor.top_left, blend=0) -> None:
+        """Renders the given text str with the given font at the given position."""
+        x, y, w, h = cls.measure(text, font, position, anchor)
         gw = font[GLY][2]
         gh = font[GLY][3]
 
@@ -127,13 +170,53 @@ class UIElement(object):
         return None
 
     def __init__(self, position, size):
-        self.pos = Vec(*position)
-        self.size = Vec(*size)
+        self._pos = Vec(*position)
+        self._size = Vec(*size)
         self.label = "uielmt"
         self.icon = None
         self.command = None
         self.active = True
         self.visible = True
+
+    @property
+    def pos(self):
+        """Gets or sets the position of this ui element."""
+        return self._pos
+
+    @pos.setter
+    def pos(self, value):
+        self._pos = Vec(*value)
+
+    @property
+    def size(self):
+        """Gets or sets the size of this ui element."""
+        return self._size
+
+    @size.setter
+    def size(self, value):
+        self._size = Vec(*value)
+
+    def get_anchor_pos(self, anchor):
+        """Returns a point relative to the given anchor"""
+        x, y = self.pos
+        w, h = self.size
+
+        # faster and prettier than if/elif chains
+        rct = {
+            Anchor.top_left: (x, y),
+            Anchor.top: (x - (w / 2), y),
+            Anchor.top_right:  (x - (w / 2), y - h),
+            Anchor.middle_left: (x, y - (h / 2)),
+            Anchor.middle: (x - (w / 2), y - (h / 2)),
+            Anchor.middle_right: (x - w, y - (h / 2)),
+            Anchor.bottom_left: (x, y - h),
+            Anchor.bottom: (x - (w / 2), y - h),
+            Anchor.bottom_right: (x - w, y - h)
+        }
+
+        if anchor in rct:
+            return rct[anchor]
+        return rct[Anchor.top_left]
 
     def contains_point(self, point) -> bool:
         """Returns whether the given point is inside this object's bounds."""
@@ -218,13 +301,33 @@ class Dispatcher(object):
 
             elif event.type == c.MOUSEBUTTONDOWN:
                 for listener in self._mouse_listeners:
-                    if event.button == 1:
-                        listener.on_left_click(listener.inner_point(event.pos))
-                    elif event.button == 2:
-                        listener.on_middle_click(listener.inner_point(event.pos))
-                    elif event.button == 3:
-                        listener.on_right_click(listener.inner_point(event.pos))
-                    elif event.button == 4:
-                        listener.on_roll_up(listener.inner_point(event.pos))
-                    elif event.button == 5:
-                        listener.on_roll_down(listener.inner_point(event.pos))
+                    {
+                        1: listener.on_left_click,
+                        2: listener.on_middle_click,
+                        3: listener.on_right_click,
+                        4: listener.on_roll_up,
+                        5: listener.on_roll_down
+                    }[event.button](listener.inner_point(event.pos))
+
+
+class Button(UIElement):
+
+    def __init__(self, position, size, label, icon):
+        super(Button, self).__init__(position, size)
+        self.label = label
+        self.icon = icon
+
+
+class Switcher(UIElement):
+
+    def __init__(self, position, size, modes, mode):
+        super(Switcher, self).__init__(position, size)
+        self.label = mode
+        self.modes = modes
+
+class List(UIElement):
+
+    def __init__(self, position, size, items):
+        super(List, self).__init__(position, size)
+        self.items = items
+        self.item = None
