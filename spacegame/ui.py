@@ -4,8 +4,8 @@ __author__ = 'Jorge'
 from enum import Enum
 import pygame
 import pygame.locals as c
-from .core import resource
-from .geometry import Vec
+from core import resource
+from geometry import Vec
 
 __all__ = [
     "BitmapFont",
@@ -67,11 +67,11 @@ class BitmapFont(object):
     small = {
         BMP: src,
         PAL: src.get_palette(),
-        NRM: (normalize_color(col) for col in src.get_palette()),
+        NRM: tuple(normalize_color(col) for col in src.get_palette()),
         CEL: (16, 16),
         GRD: (32, 7),
         GLY: (5, 2, 6, 12),
-        CHR: "",
+        CHR: " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~_¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
         BFC: ((0, 0, 0), (255, 255, 255))
     }
     # medium and large size fonts are yet to be done.
@@ -83,7 +83,7 @@ class BitmapFont(object):
 
         for index in range(256):
             color = blend_color(background, foreground, font[NRM][index])
-            font[BMP].set_palette_at(color)
+            font[BMP].set_palette_at(index, color)
 
         font[BFC] = (background, foreground)
 
@@ -177,6 +177,7 @@ class UIElement(object):
         self.command = None
         self.active = True
         self.visible = True
+        self.hover = False
 
     @property
     def pos(self):
@@ -196,22 +197,22 @@ class UIElement(object):
     def size(self, value):
         self._size = Vec(*value)
 
-    def get_anchor_pos(self, anchor):
+    def get_anchor_pos(self, anchor) -> Vec:
         """Returns a point relative to the given anchor"""
         x, y = self.pos
         w, h = self.size
 
         # faster and prettier than if/elif chains
         rct = {
-            Anchor.top_left: (x, y),
-            Anchor.top: (x - (w / 2), y),
-            Anchor.top_right:  (x - (w / 2), y - h),
-            Anchor.middle_left: (x, y - (h / 2)),
-            Anchor.middle: (x - (w / 2), y - (h / 2)),
-            Anchor.middle_right: (x - w, y - (h / 2)),
-            Anchor.bottom_left: (x, y - h),
-            Anchor.bottom: (x - (w / 2), y - h),
-            Anchor.bottom_right: (x - w, y - h)
+            Anchor.top_left: Vec(x, y),
+            Anchor.top: Vec(x + (w / 2), y),
+            Anchor.top_right:  Vec(x + (w / 2), y + h),
+            Anchor.middle_left: Vec(x, y + (h / 2)),
+            Anchor.middle: Vec(x + (w / 2), y + (h / 2)),
+            Anchor.middle_right: Vec(x + w, y + (h / 2)),
+            Anchor.bottom_left: Vec(x, y + h),
+            Anchor.bottom: Vec(x + (w / 2), y + h),
+            Anchor.bottom_right: Vec(x + w, y + h)
         }
 
         if anchor in rct:
@@ -244,7 +245,7 @@ class UIElement(object):
         """Called when the middle mouse button is pressed over this object."""
         pass
 
-    def on_client_enter(self, client) -> None:
+    def on_client_enter(self) -> None:
         """Called when the mouse moves in this object."""
         pass
 
@@ -252,7 +253,7 @@ class UIElement(object):
         """Called when the mouse moves over this object."""
         pass
 
-    def on_client_exit(self, client) -> None:
+    def on_client_exit(self) -> None:
         """Called when the mouse moves out this object."""
         pass
 
@@ -267,6 +268,21 @@ class UIElement(object):
     def on_command(self) -> None:
         """Called when the this object's keyboard command is entered."""
         pass
+
+    def basic_render(self, surface) -> None:
+        """Displays this object with default rendering"""
+        if not self.visible:
+            return
+        l, t = self.pos
+        r, b = self.get_anchor_pos(Anchor.bottom_right)
+        tpos = self.get_anchor_pos(Anchor.middle)
+        backcolor = (128, 128, 128)
+        forecolor = {False: (255, 255, 192), True: (255, 0, 0)}
+        pts = ((l,t), (r, t), (r, b), (l, b))
+        pygame.draw.polygon(surface, backcolor, pts, 0)
+        pygame.draw.polygon(surface, forecolor[self.hover], pts, 1)
+        BitmapFont.set_colors(BitmapFont.small, backcolor, forecolor[self.hover])
+        BitmapFont.render(surface, str(self.label), BitmapFont.small, tpos, Anchor.middle)
 
 
 class Dispatcher(object):
@@ -292,11 +308,13 @@ class Dispatcher(object):
                         if listener in self._mouse_listeners:
                             listener.on_client_move(listener.inner_point(event.pos))
                         else:
+                            listener.hover = True
                             listener.on_client_enter()
                             self._mouse_listeners.append(listener)
                     else:
                         if listener in self._mouse_listeners:
-                            listener.on_clent_exit()
+                            listener.hover = False
+                            listener.on_client_exit()
                             self._mouse_listeners.remove(listener)
 
             elif event.type == c.MOUSEBUTTONDOWN:

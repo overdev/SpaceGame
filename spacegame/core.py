@@ -2,6 +2,7 @@ __author__ = "Jorge A. Gomes"
 
 import os
 from os import path
+import pygame
 
 __all__ = [
     "Game",
@@ -14,8 +15,8 @@ __all__ = [
 def resource(name) -> str:
     """Returns the full path of a file with given name."""
     cwd = os.getcwd()
-    rd = '/res/{}'.format(name)
-    return path.join(cwd, rd)
+    rd = '{}\\res\\{}'.format(cwd, name)
+    return rd
 
 
 class Game(object):
@@ -26,12 +27,37 @@ class Game(object):
     def run(cls, scene) -> None:
         """Starts the game by running the first scene."""
 
+        Display.show((800, 600))
+
         cls.scene = scene
 
         # while there's a scene set
         while cls.scene is not None:
             # plays this scene
             cls.scene.play()
+
+
+class Display(object):
+
+    @classmethod
+    def show(cls, size, flags=0) -> None:
+        pygame.display.set_mode(size, flags)
+
+    @classmethod
+    def surface(cls) -> pygame.Surface:
+        return pygame.display.get_surface()
+
+    @classmethod
+    def size(cls) -> tuple:
+        return cls.surface().get_size()
+
+    @classmethod
+    def clear(cls, color=(0, 0, 0)) -> None:
+        cls.surface().fill(color)
+
+    @classmethod
+    def on_screen(cls) -> None:
+        pygame.display.flip()
 
 
 class Scene(object):
@@ -46,6 +72,11 @@ class Scene(object):
     def goto(cls, scene) -> None:
         """Sets the next scene to be played."""
         Game.scene = scene
+
+    @classmethod
+    def get_current(cls) -> object:
+        """Returns the current Game scene being played."""
+        return Game.scene
 
     @classmethod
     def play(cls) -> None:

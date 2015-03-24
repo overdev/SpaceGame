@@ -183,7 +183,7 @@ def circle_line_intersection(l1, l2, c1, r) -> tuple or None:
 class Vec(namedtuple("Vec", "x y")):
 
     @classmethod
-    def swap_xy(cls, v) -> Vec:
+    def swap_xy(cls, v) -> object:
         """Returns a new vector with component values swapped."""
         return cls(v[1], v[0])
 
