@@ -2,6 +2,7 @@ __author__ = 'Jorge A. Gomes'
 
 
 import math
+from collections import namedtuple
 
 
 __all__ = [
@@ -15,7 +16,8 @@ __all__ = [
     "point_line_distance",
     "point_line_nearest_point",
     "line_line_intersection",
-    "circle_line_intersection"
+    "circle_line_intersection",
+    "Vec"
 ]
 
 
@@ -176,3 +178,38 @@ def circle_line_intersection(l1, l2, c1, r) -> tuple or None:
         u2 = (-b - sqrt_delta) / (2 * a)
 
         return lerp2d(l1, p3, u1), lerp2d(l1, p3, u2)
+
+
+class Vec(namedtuple("Vec", "x y")):
+
+    @classmethod
+    def swap_xy(cls, v) -> Vec:
+        """Returns a new vector with component values swapped."""
+        return cls(v[1], v[0])
+
+    def __add__(self, other) -> tuple:
+        return Vec(self[0] + other[0], self[1] + other[1])
+
+    def __sub__(self, other) -> tuple:
+        return Vec(self[0] - other[0], self[1] - other[1])
+
+    def __truediv__(self, other) -> tuple:
+        return Vec(self[0] / other[0], self[1] / other[1])
+
+    def __divmod__(self, other) -> tuple:
+        return Vec(self[0] / other, self[1] / other), Vec(self[0] % other, self[1] % other)
+
+    def __mul__(self, other) -> tuple:
+        return Vec(self[0] * other[0], self[1] * other[1])
+
+    def __radd__(self, other) -> tuple:
+        return Vec(other[0] + self[0], other[1] + self[1])
+
+    def __rsub__(self, other) -> tuple:
+        return Vec(other[0] - self[0], other[1] - self[1])
+
+    def __rtruediv__(self, other) -> tuple:
+        return Vec(other[0] / self[0], other[1] / self[1])
+
+    def __rmul__(self, other) -> tuple:
+        return Vec(other[0] * self[0], other[1] * self[1])

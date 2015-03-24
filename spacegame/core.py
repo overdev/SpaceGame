@@ -1,9 +1,22 @@
 __author__ = "Jorge A. Gomes"
 
+import os
+from os import path
+
 __all__ = [
     "Game",
-    "Scene"
+    "Scene",
+    "resource",
+    "Vec"
 ]
+
+
+def resource(name) -> str:
+    """Returns the full path of a file with given name."""
+    cwd = os.getcwd()
+    rd = '/res/{}'.format(name)
+    return path.join(cwd, rd)
+
 
 class Game(object):
 
