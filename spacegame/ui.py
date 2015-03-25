@@ -4,8 +4,8 @@ __author__ = 'Jorge'
 from enum import Enum
 import pygame
 import pygame.locals as c
-from core import resource
-from geometry import Vec
+from spacegame.core import resource
+from spacegame.geometry import Vec
 
 __all__ = [
     "BitmapFont",
@@ -74,7 +74,28 @@ class BitmapFont(object):
         CHR: " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~_¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
         BFC: ((0, 0, 0), (255, 255, 255))
     }
-    # medium and large size fonts are yet to be done.
+    src = pygame.image.load(resource("medium_(0,0,36,18).png"))
+    medium = {
+        BMP: src,
+        PAL: src.get_palette(),
+        NRM: tuple(normalize_color(col) for col in src.get_palette()),
+        CEL: (16, 36),
+        GRD: (32, 7),
+        GLY: (0, 0, 16, 36),
+        CHR: " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~_¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+        BFC: ((0, 0, 0), (255, 255, 255))
+    }
+    src = pygame.image.load(resource("large_(0,0,64,32).png"))
+    large = {
+        BMP: src,
+        PAL: src.get_palette(),
+        NRM: tuple(normalize_color(col) for col in src.get_palette()),
+        CEL: (32, 64),
+        GRD: (32, 7),
+        GLY: (0, 0, 32, 64),
+        CHR: " !\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~_¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ",
+        BFC: ((0, 0, 0), (255, 255, 255))
+    }
     del src
 
     @classmethod
@@ -165,7 +186,7 @@ class UIElement(object):
             elif shift:
                 return c.K_LSHIFT, event.key
             else:
-                return event.key
+                return (event.key,)
 
         return None
 
@@ -178,6 +199,9 @@ class UIElement(object):
         self.active = True
         self.visible = True
         self.hover = False
+
+        # the initialization
+        self.on_initialize()
 
     @property
     def pos(self):
@@ -233,39 +257,42 @@ class UIElement(object):
         """Returns whether this object will respond to keyboard input."""
         return command == self.command and self.active is True and self.command is not None
 
-    def on_left_click(self, client) -> None:
+    def on_initialize(self):
+        """Called in the instance creation."""
+
+    def on_left_click(self, client, game) -> None:
         """Called when the left mouse button is pressed over this object."""
         pass
 
-    def on_right_click(self, client) -> None:
+    def on_right_click(self, client, game) -> None:
         """Called when the right mouse button is pressed over this object."""
         pass
 
-    def on_middle_click(self, client) -> None:
+    def on_middle_click(self, client, game) -> None:
         """Called when the middle mouse button is pressed over this object."""
         pass
 
-    def on_client_enter(self) -> None:
+    def on_client_enter(self, game) -> None:
         """Called when the mouse moves in this object."""
         pass
 
-    def on_client_move(self, client) -> None:
+    def on_client_move(self, client, game) -> None:
         """Called when the mouse moves over this object."""
         pass
 
-    def on_client_exit(self) -> None:
+    def on_client_exit(self, game) -> None:
         """Called when the mouse moves out this object."""
         pass
 
-    def on_roll_up(self, client) -> None:
+    def on_roll_up(self, client, game) -> None:
         """Called when the mouse wheel rolls up over this object."""
         pass
 
-    def on_roll_down(self, client) -> None:
+    def on_roll_down(self, client, game) -> None:
         """Called when the mouse wheel rolls down over this object."""
         pass
 
-    def on_command(self) -> None:
+    def on_command(self, game) -> None:
         """Called when the this object's keyboard command is entered."""
         pass
 
@@ -281,8 +308,8 @@ class UIElement(object):
         pts = ((l,t), (r, t), (r, b), (l, b))
         pygame.draw.polygon(surface, backcolor, pts, 0)
         pygame.draw.polygon(surface, forecolor[self.hover], pts, 1)
-        BitmapFont.set_colors(BitmapFont.small, backcolor, forecolor[self.hover])
-        BitmapFont.render(surface, str(self.label), BitmapFont.small, tpos, Anchor.middle)
+        BitmapFont.set_colors(BitmapFont.medium, backcolor, forecolor[self.hover])
+        BitmapFont.render(surface, str(self.label), BitmapFont.medium, tpos, Anchor.middle)
 
 
 class Dispatcher(object):
@@ -293,28 +320,37 @@ class Dispatcher(object):
         for listener in listeners:
             self.listeners.append(listener)
 
-    def process_events(self, events) -> None:
+        # post an mouse motion event to update objects under the mouse
+        # when the scene starts
+        pos = pygame.mouse.get_pos()
+        rel = (0, 0)
+        e = pygame.event.Event(c.MOUSEMOTION, {'pos':pos, 'rel':rel, 'buttons':(False, False, False)})
+        pygame.event.post(e)
+
+    def process_events(self, events, game) -> None:
 
         for event in events:
-            if event.type == c.KEYDOWN:
+            if event.type == c.QUIT:
+                game.scene = None
+            elif event.type == c.KEYDOWN:
                 cmd = UIElement.get_command(event)
                 for listener in self.listeners:
                     if listener.responds_to(cmd):
-                        listener.on_command()
+                        listener.on_command(game)
 
             elif event.type == c.MOUSEMOTION:
                 for listener in self.listeners:
                     if listener.contains_point(event.pos):
                         if listener in self._mouse_listeners:
-                            listener.on_client_move(listener.inner_point(event.pos))
+                            listener.on_client_move(listener.inner_point(event.pos), game)
                         else:
                             listener.hover = True
-                            listener.on_client_enter()
+                            listener.on_client_enter(game)
                             self._mouse_listeners.append(listener)
                     else:
                         if listener in self._mouse_listeners:
                             listener.hover = False
-                            listener.on_client_exit()
+                            listener.on_client_exit(game)
                             self._mouse_listeners.remove(listener)
 
             elif event.type == c.MOUSEBUTTONDOWN:
@@ -325,7 +361,7 @@ class Dispatcher(object):
                         3: listener.on_right_click,
                         4: listener.on_roll_up,
                         5: listener.on_roll_down
-                    }[event.button](listener.inner_point(event.pos))
+                    }[event.button](listener.inner_point(event.pos), game)
 
 
 class Button(UIElement):

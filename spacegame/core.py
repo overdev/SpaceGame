@@ -1,6 +1,5 @@
 __author__ = "Jorge A. Gomes"
 
-import os
 from os import path
 import pygame
 
@@ -14,14 +13,26 @@ __all__ = [
 
 def resource(name) -> str:
     """Returns the full path of a file with given name."""
-    cwd = os.getcwd()
-    rd = '{}\\res\\{}'.format(cwd, name)
-    return rd
+    cwd = path.split(__file__)[0]
+    rd = 'res\\{}'.format(name)
+    return path.join(cwd, rd)
 
 
 class Game(object):
 
     """The game launcher."""
+
+    #scene = None
+
+    @classmethod
+    def goto(cls, scene) -> None:
+        """Sets the next scene to play"""
+        cls.scene = scene
+
+    @classmethod
+    def end(cls) -> None:
+        """Ends the game (by setting None as next scene)."""
+        cls.scene = None
 
     @classmethod
     def run(cls, scene) -> None:
@@ -34,7 +45,7 @@ class Game(object):
         # while there's a scene set
         while cls.scene is not None:
             # plays this scene
-            cls.scene.play()
+            cls.scene.play(cls)
 
 
 class Display(object):
@@ -73,13 +84,13 @@ class Scene(object):
         """Sets the next scene to be played."""
         Game.scene = scene
 
-    @classmethod
-    def get_current(cls) -> object:
-        """Returns the current Game scene being played."""
-        return Game.scene
+    # @classmethod
+    # def get_current(cls) -> object:
+    #     """Returns the current Game scene being played."""
+    #     return Game.scene
 
     @classmethod
-    def play(cls) -> None:
+    def play(cls, game) -> None:
         """Runs the game under this specific logic.
 
         Important: release all resources used in this scene when it finishes playing

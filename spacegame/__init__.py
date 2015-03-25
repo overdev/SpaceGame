@@ -3,14 +3,11 @@
 A simple 2d space shooter made with python and pygame.
 """
 
-# Make sure you ha python34 and pygame 1.9.1+ installed before run this code.
+# Make sure you have python34 and pygame 1.9.1+ installed before run this code.
 import pygame
-import pygame.locals as c
-from core import Game
-from scenes import SceneMain
+from spacegame import scenes
+from spacegame import core
 
-# this module itself does nothing important, but its good to have pygame
-# initialized as soon as possible.
-pygame.init()
-
-Game.run(SceneMain)
+if __name__ == "__main__":
+    pygame.init()
+    core.Game.run(scenes.SceneMain)
