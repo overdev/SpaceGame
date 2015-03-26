@@ -46,13 +46,11 @@ class SceneMain(Scene):
             ]
         )
 
-        clock = pygame.time.Clock()
         textcolor = (128, 0, 0)
         fillcolor = (32, 0, 0)
         BitmapFont.set_colors(BitmapFont.large, fillcolor, textcolor)
 
         while game.scene is cls:
-            clock.tick(30)
             events = pygame.event.get()
             dispatcher.process_events(events, game)
 
@@ -64,7 +62,7 @@ class SceneMain(Scene):
             for gui in dispatcher.listeners:
                 gui.basic_render(surface)
 
-            Display.on_screen()
+            Display.on_screen(30)
 
 
 class SceneOption(Scene):
@@ -92,13 +90,11 @@ class SceneOption(Scene):
             ]
         )
         # dispatcher.listeners[0].command = (c.K_ESCAPE)
-        clock = pygame.time.Clock()
         textcolor = (0, 128, 128)
         fillcolor = (0, 32, 32)
         BitmapFont.set_colors(BitmapFont.large, fillcolor, textcolor)
 
         while game.scene is cls:
-            clock.tick(30)
             events = pygame.event.get()
             dispatcher.process_events(events, game)
 
@@ -109,5 +105,5 @@ class SceneOption(Scene):
             for gui in dispatcher.listeners:
                 gui.basic_render(surface)
 
-            Display.on_screen()
+            Display.on_screen(30)
 

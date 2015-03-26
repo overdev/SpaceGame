@@ -31,25 +31,30 @@ def cross(a, b) -> float:
     return (float(a[0]) * b[1]) - (float(a[1]) * b[0])
 
 
-def radius(circunference) -> float:
+def hypot(a) -> float:
+    """Returns the hypotenuse of point."""
+    return (a[0] ** 2) + (a[1] ** 2)
+
+
+def radius(circunf) -> float:
     """Returns the radius of a circle with given surface length."""
-    return (circunference / math.pi) / 2
+    return (circunf / math.pi) / 2
 
 
-def diameter(circunference) -> float:
+def diameter(circunf) -> float:
     """Returns the diameter of a circle with given surface length."""
-    return circunference / math.pi
+    return circunf / math.pi
 
 
-def circunference(radius) -> float:
+def circunference(rad) -> float:
     """Returns the surface length of a circle with given radius."""
-    return 2 * math.pi * radius
+    return 2 * math.pi * rad
 
 
-def lengthdir(direction, distance) -> tuple:
+def lengthdir(angle, length) -> tuple:
     """Returns a point at given angle and offset."""
-    r = math.radians(direction)
-    return (math.cos(r) * distance, math.sin(r) * distance)
+    r = math.radians(angle)
+    return math.cos(r) * length, math.sin(r) * length
 
 
 def distance(a, b, fast=False) -> float:
@@ -67,6 +72,28 @@ def direction(a, b) -> float:
     dy = a[1] - b[1]
 
     return math.degrees(math.atan2(dy, dx))
+
+
+def translate(a, b) -> tuple:
+    """Translates the point."""
+    return a[0] + b[0], a[1] + b[1]
+
+
+def rotate(a, angle) -> tuple:
+    """Rotates the point."""
+    rad = math.radians(angle)
+    cos = math.cos(rad)
+    sin = math.sin(rad)
+
+    x = cos * a[0] - sin * a[1]
+    y = sin * a[0] + cos * a[1]
+
+    return x, y
+
+
+def scale(a, scalar) -> tuple:
+    """Scales the point."""
+    return a[0] * scalar, a[1] * scalar
 
 
 def lerp2d(a, b, r) -> tuple:
@@ -131,7 +158,7 @@ def point_line_nearest_point(p1, l1, l2) -> tuple:
     elif param > 1:
         return l2
 
-    return (l1[0] + param * c, l1[1] + param * d)
+    return l1[0] + param * c, l1[1] + param * d
 
 
 def line_line_intersection(a1, a2, b1, b2) -> tuple or None:

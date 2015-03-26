@@ -50,6 +50,8 @@ class Game(object):
 
 class Display(object):
 
+    clock = pygame.time.Clock()
+
     @classmethod
     def show(cls, size, flags=0) -> None:
         pygame.display.set_mode(size, flags)
@@ -67,7 +69,9 @@ class Display(object):
         cls.surface().fill(color)
 
     @classmethod
-    def on_screen(cls) -> None:
+    def on_screen(cls, fps=None) -> None:
+        if isinstance(fps, int):
+            cls.clock.tick(fps)
         pygame.display.flip()
 
 

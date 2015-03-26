@@ -257,8 +257,13 @@ class UIElement(object):
         """Returns whether this object will respond to keyboard input."""
         return command == self.command and self.active is True and self.command is not None
 
-    def on_initialize(self):
+    def on_initialize(self) -> None:
         """Called in the instance creation."""
+        pass
+
+    def on_keydown(self, keys, game) -> None:
+        """Called whenever a keyboard key is down."""
+        pass
 
     def on_left_click(self, client, game) -> None:
         """Called when the left mouse button is pressed over this object."""
@@ -305,7 +310,7 @@ class UIElement(object):
         tpos = self.get_anchor_pos(Anchor.middle)
         backcolor = (128, 128, 128)
         forecolor = {False: (255, 255, 192), True: (255, 0, 0)}
-        pts = ((l,t), (r, t), (r, b), (l, b))
+        pts = ((l, t), (r, t), (r, b), (l, b))
         pygame.draw.polygon(surface, backcolor, pts, 0)
         pygame.draw.polygon(surface, forecolor[self.hover], pts, 1)
         BitmapFont.set_colors(BitmapFont.medium, backcolor, forecolor[self.hover])
@@ -324,7 +329,7 @@ class Dispatcher(object):
         # when the scene starts
         pos = pygame.mouse.get_pos()
         rel = (0, 0)
-        e = pygame.event.Event(c.MOUSEMOTION, {'pos':pos, 'rel':rel, 'buttons':(False, False, False)})
+        e = pygame.event.Event(c.MOUSEMOTION, {'pos': pos, 'rel': rel, 'buttons': (False, False, False)})
         pygame.event.post(e)
 
     def process_events(self, events, game) -> None:
@@ -363,6 +368,11 @@ class Dispatcher(object):
                         5: listener.on_roll_down
                     }[event.button](listener.inner_point(event.pos), game)
 
+        keys = pygame.key.get_pressed()
+        for listener in self.listeners:
+            if listener.active:
+                listener.on_keydown(keys, game)
+
 
 class Button(UIElement):
 
@@ -378,6 +388,7 @@ class Switcher(UIElement):
         super(Switcher, self).__init__(position, size)
         self.label = mode
         self.modes = modes
+
 
 class List(UIElement):
 
