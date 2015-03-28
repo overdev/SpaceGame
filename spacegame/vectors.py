@@ -179,6 +179,18 @@ class Vector(object):
         self.x, self.y = float(value[0]), float(value[1])
 
     @property
+    def ix(self) -> int:
+        return int(self.x)
+
+    @property
+    def iy(self) -> int:
+        return int(self.y)
+
+    @property
+    def ixy(self):
+        return self.ix, self.iy
+
+    @property
     def point(self) -> tuple:
         """Returns a 2-tuple with x,y values truncated."""
         return int(self.x), int(self.y)
@@ -206,12 +218,14 @@ class Vector(object):
             return Vector(self.x / length, self.y / length)
         return Vector.zero()
 
-    def reset(self) -> None:
+    def reset(self) -> 'self':
         """Sets the component values to zero."""
         self.x = 0.0
         self.y = 0.0
 
-    def normalize(self) -> None:
+        return self
+
+    def normalize(self) -> 'self':
         """Sets this vector length to one."""
         length = self.length
         if length != 0:
@@ -220,13 +234,17 @@ class Vector(object):
         else:
             self.reset()
 
-    def perpend(self) -> None:
+        return self
+
+    def perpend(self) -> 'self':
         """Rotates 90 degrees clockwise."""
         x, y = self
         self.x = -y
         self.y = x
 
-    def rotate(self, angle) -> None:
+        return self
+
+    def rotate(self, angle) -> 'self':
         """Rotates this vector by a given angle."""
         rad = math.radians(angle)
         cos = math.cos(rad)
@@ -235,10 +253,32 @@ class Vector(object):
         self.x = cos * x - sin * y
         self.y = sin * x + cos * y
 
-    def scale(self, scalar) -> None:
+        return self
+
+    def fast_rotate(self, cos, sin) -> 'self':
+        x, y = self
+        self.x = cos * x - sin * y
+        self.y = sin * x + cos * y
+
+        return self
+
+    def fast_rotated(self, other: object, cos, sin):
+        x, y = other
+        self.x = cos * x - sin * y
+        self.y = sin * x + cos * y
+
+        return self
+
+    def rescale(self, scalar: tuple) -> 'self':
+        self.x *= scalar[0]
+        self.y *= scalar[1]
+
+    def scale(self, scalar: float) -> 'self':
         """Scales this vector by scalar ammount."""
         self.x *= scalar
         self.y *= scalar
+
+        return self
 
     def dot(self, other) -> float:
         """Returns the dot product of this and other vector."""
@@ -248,14 +288,14 @@ class Vector(object):
         """Returns the cross product of this and other vector."""
         return (self.x * other[1]) - (self.y[1] * other[0])
 
-    def project(self, other):
+    def project(self, other) -> 'Vector':
         """Returns the projection of this vector onto other vector."""
         mag = (other[0] ** 2) + (other[1] ** 2)
         dotp = self.dot(other)
         scalar = dotp / mag
         return Vector(other[0] * scalar, other[1] * scalar)
 
-    def interpolate(self, other, ratio):
+    def interpolate(self, other, ratio) -> 'Vector':
         """Returns the linar interpolation between this and onther vector."""
         return Vector(
             self.x + (other[0] - self.x) * ratio,

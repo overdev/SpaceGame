@@ -12,6 +12,7 @@ __all__ = [
     "distance",
     "direction",
     "lengthdir",
+    "lerp1d",
     "lerp2d",
     "point_line_distance",
     "point_line_nearest_point",
@@ -91,12 +92,17 @@ def rotate(a, angle) -> tuple:
     return x, y
 
 
-def scale(a, scalar) -> tuple:
+def scale(a: tuple, scalar: float) -> tuple:
     """Scales the point."""
     return a[0] * scalar, a[1] * scalar
 
 
-def lerp2d(a, b, r) -> tuple:
+def lerp1d(a: float, b: float, r: float) -> float:
+    """Returns a point interpolated from a to b, at r."""
+    return a + (b - a) * r
+
+
+def lerp2d(a: tuple, b: tuple, r: float) -> tuple:
     """Returns a point interpolated from a to b, at r."""
     return (
         a[0] + (b[0] - a[0]) * r,
