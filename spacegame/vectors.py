@@ -269,9 +269,17 @@ class Vector(object):
 
         return self
 
-    def rescale(self, scalar: tuple) -> 'self':
+    def rescale(self, scalar: 'tuple or Vector') -> 'self':
         self.x *= scalar[0]
         self.y *= scalar[1]
+
+        return self
+
+    def rescaled(self, point, scalar: 'sequence') -> 'self':
+        self.x = point[0] * scalar[0]
+        self.y = point[1] * scalar[1]
+
+        return self
 
     def scale(self, scalar: float) -> 'self':
         """Scales this vector by scalar ammount."""

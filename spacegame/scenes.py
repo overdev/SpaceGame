@@ -7,6 +7,9 @@ from spacegame.ui import BitmapFont
 from spacegame.geometry import *
 from spacegame.core import Scene
 from spacegame.core import Display
+from spacegame.assets import *
+from spacegame.actors import *
+from spacegame.vectors import Vector
 import pygame
 import pygame.locals as c
 
@@ -25,7 +28,7 @@ class SceneMain(Scene):
 
         def on_left_click(self, client, game) -> None:
             """Go to Options scene."""
-            game.goto(SceneOption)
+            game.goto(SceneGame)
 
         def on_command(self, game) -> None:
             """Go to Options scene."""
@@ -82,7 +85,7 @@ class SceneOption(Scene):
             game.goto(SceneMain)
 
     @classmethod
-    def play(cls, game) -> None:
+    def play(cls, game: type) -> None:
 
         dispatcher = Dispatcher(
             [
@@ -107,3 +110,69 @@ class SceneOption(Scene):
 
             Display.on_screen(30)
 
+
+class SceneGame(Scene):
+
+    class Square(Actor):
+
+        points = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]
+
+        def __init__(self, position: Vector, rotation: float, scale: Vector):
+            super(SceneGame.Square, self).__init__(SceneGame.Square.points)
+            self.position = position
+            self.rotation = rotation
+            self.scale = scale
+
+        def on_animation_end(self, attr: str, pathstate: PathState, game: type) -> None:
+            """Back to previous scene."""
+            game.scene = SceneMain
+
+
+    @classmethod
+    def play(cls, game: type) -> None:
+
+        dispatcher = Dispatcher(
+            [
+                SceneOption.BackButton(Vec(100, 100), Vec(100, 40), "Back", None)
+            ]
+        )
+
+        sq = cls.Square(Vector(50, 50), 0, Vector(20, 30))
+        # sq.set_path('rotation', Path1d([0, 180, 10, 30, 0], True), AssignMode.direct_value, -1)
+        sq.set_path(
+            'scale',
+            Path2d(
+                [
+                    (0, 0), (50, 10), (10, 50), (100, 100), (0, 0)
+                ],
+                False
+            ),
+            AssignMode.vector_updt,
+            -1)
+        # sq.paths['rotation'].set_animation(repeats=1)
+        room = Room(
+            [
+                sq
+            ]
+        )
+        textcolor = (0, 0, 92)
+        fillcolor = (0, 0, 16)
+        BitmapFont.set_colors(BitmapFont.large, fillcolor, textcolor)
+
+        while game.scene is cls:
+            events = pygame.event.get()
+            dispatcher.process_events(events, game)
+            room.update(room.view, game)
+
+            Display.clear(fillcolor)
+            surface = Display.surface()
+
+            BitmapFont.render(surface, "Game", BitmapFont.large, (0, 0))
+
+            for actor in room.actors:
+                actor.default_render(surface, room.view)
+
+            for gui in dispatcher.listeners:
+                gui.basic_render(surface)
+
+            Display.on_screen(60)

@@ -38,69 +38,6 @@ class SAT(Enum):
 SAT_NO_COLLISION = {SAT.overlapped: False, SAT.sep_axis: None}
 
 
-class PathState(object):
-
-    __slots__ = ("attr", "asgnmode", "path", "counter", "_ratio", "_step", "_steps")
-
-    def __init__(self, attr: str, asgnmode: AssignMode, path: Path) -> 'PathState':
-        self.attr = attr
-        self.asgnmode = asgnmode
-        self.path = path
-        self.counter = -1
-        self._ratio = 0.0
-        self._step = 0
-        self._steps = 60
-
-    @property
-    def ratio(self) -> float:
-        """Gets or sets the ratio of this PathState."""
-        return self._ratio
-
-    @ratio.setter
-    def ratio(self, value) -> None:
-        self._ratio = value % 1.0
-
-    @property
-    def length(self) -> float:
-        """Gets or sets the ratio based on the path's length."""
-        return self.path.get_length(self._ratio)
-
-    @length.setter
-    def length(self, value) -> None:
-        self._ratio = self.path.get_ratio(value)
-
-    @property
-    def position(self) -> float or Vector:
-        """Gets the position in the path."""
-        return self.path.get_position(self._ratio)
-
-    @property
-    def is_animating(self) -> bool:
-        """Gets whether this path state animation hasn't stopped."""
-        return not (self._step == self._steps and self.counter == 0)
-
-    def set_animation(self, framerate: int=60, seconds: float=1.0, repeats: int=-1) -> None:
-        self.counter = repeats
-        self._step = 0
-        self._steps = int(framerate * seconds)
-
-    def animate(self) -> bool:
-        """An animation helper method. Returns whether the animation has ended."""
-
-        self._ratio = self._step / float(self._steps)
-        self._step += 1
-        if self._step > self._steps:
-            if self.counter >= 1:
-                self.counter -= 1
-                self._step = 0
-            elif self.counter == -1:
-                self._step = 0
-            else:
-                self._step = self._steps
-                return True
-        return False
-
-
 class Path(object):
 
     def get_position(self, ratio: float) -> None:
@@ -134,12 +71,19 @@ class Path1d(Path):
         if self.closed:
             length += abs(self.values[0] - self.values[-1])
 
+        return length
+
     def get_position(self, ratio: float) -> float:
         """Returns a position in the path relative to the ratio of its length."""
-        ratio %= 1.0
+
+        if len(self.values) == 0:
+            raise ValueError("Path contains no values.")
+
+        if len(self.values) == 1:
+            return self.values[0]
 
         if self.length == 0.0:
-            return 0.0
+            return self.values[0]
 
         if ratio == 0.0 or (self.closed and ratio == 1.0):
             return self.values[0]
@@ -147,17 +91,27 @@ class Path1d(Path):
         if ratio == 1.0:
             return self.values[-1]
 
-        if len(self.values) > 1:
-            limit = self.length * ratio
-            dist = 0
-            vals = self.closed and self.values[:-1] or self.values[:]
-            for i, d in enumerate(vals):
-                j = (i + 1) % len(self.values)
-                if dist <= limit < dist + d:
-                    rem = limit - dist
-                    ratio2 = rem / d
-                    return lerp1d(vals[i], vals[j], ratio2)
-                dist += d
+        ratio %= 1.0
+        size = len(self.values)
+        total = self.length
+        limit = total * ratio
+        after = 0
+        before = 0
+        i = 0
+        d = 0
+        while after < limit:
+            a = self.values[i]
+            b = self.values[(i + 1) % size]
+            d = abs(b - a)
+            before = after
+            after += d
+            i += 1
+
+        assert before <= limit <= after
+
+        r = float(after - limit) / d
+
+        return lerp1d(self.values[i], self.values[i-1], r)
 
     def get_length(self, ratio: float) -> float:
         """Returns a path length relative to given ratio."""
@@ -225,14 +179,15 @@ class Path2d(Path):
         if len(self.points) > 1:
             limit = self.length * ratio
             dist = 0
-            pts = self.closed and self.lengths[:-1] or self.lengths[:]
+            pts = self.closed and self.points[:-1] or self.points[:]
             for i, d in enumerate(pts):
                 j = (i + 1) % len(self.points)
-                if dist <= limit < dist + d:
+                if dist <= limit < dist + self.lengths[i]:
                     rem = limit - dist
-                    ratio2 = rem / d
+                    ratio2 = rem / self.lengths[i]
+                    # print(pts[i], pts[j])
                     return lerp2d(pts[i], pts[j], ratio2)
-                dist += d
+                dist += self.lengths[i]
 
     def get_length(self, ratio: float) -> float:
         """Returns a path length relative to given ratio."""
@@ -287,6 +242,71 @@ class PathCircle(Path):
         return length / self.length
 
 
+class PathState(object):
+
+    __slots__ = ("attr", "asgnmode", "path", "counter", "_ratio", "_step", "_steps")
+
+    def __init__(self, attr: str, asgnmode: AssignMode, path: Path) -> 'PathState':
+        self.attr = attr
+        self.asgnmode = asgnmode
+        self.path = path
+        self.counter = -1
+        self._ratio = 0.0
+        self._step = 0
+        self._steps = 60
+
+    @property
+    def ratio(self) -> float:
+        """Gets or sets the ratio of this PathState."""
+        return self._ratio
+
+    @ratio.setter
+    def ratio(self, value) -> None:
+        self._ratio = value % 1.0
+
+    @property
+    def length(self) -> float:
+        """Gets or sets the ratio based on the path's length."""
+        return self.path.get_length(self._ratio)
+
+    @length.setter
+    def length(self, value) -> None:
+        self._ratio = self.path.get_ratio(value)
+
+    @property
+    def position(self) -> float or Vector:
+        """Gets the position in the path."""
+        return self.path.get_position(self._ratio)
+
+    @property
+    def is_animating(self) -> bool:
+        """Gets whether this path state animation hasn't stopped."""
+        return not (self._step == self._steps - 1 and self.counter == 0)
+
+    def set_animation(self, framerate: int=60, seconds: float=1.0, repeats: int=-1) -> None:
+        self.counter = repeats
+        self._step = 0
+        self._steps = int(framerate * seconds)
+
+    def animate(self) -> bool:
+        """An animation helper method. Returns whether the animation has ended."""
+
+        finished = False
+        if self.counter > 0:
+            self._step = (self._step + 1) % (self._steps)
+            if self._step == 0:
+                self.counter -= 1
+        elif self.counter == 0:
+            self._step = min(self._step + 1, self._steps - 1)
+            finished = self._step == self._steps -1
+        elif self.counter < 0:
+            self._step = (self._step + 1) % (self._steps)
+
+        self._ratio = self._step / float(self._steps - 1)
+
+        return finished
+
+
 class Parallax(object):
 
     def __init__(self, image: pygame.Surface, scrollratio: Vector):
@@ -313,7 +333,7 @@ class Shape(object):
         return (vector2 - vector1).normalize().perpend()
 
     @classmethod
-    def poly_poly(cls, poly1: Polygon, poly2: Polygon) -> dict:
+    def poly_poly(cls, poly1: 'Polygon', poly2: 'Polygon') -> dict:
         vectors1 = poly1.points
         vectors2 = poly2.points
         if len(vectors1) == 2:
@@ -332,7 +352,7 @@ class Shape(object):
         for i in range(len(vectors1)):
             axis = cls.find_normal_axis(vectors1, i)
             min1 = axis.dot(vectors1[0])
-            max1 = min
+            max1 = min1
 
             # project polygon 1
             for j in range(1, len(vectors1)):
@@ -363,7 +383,7 @@ class Shape(object):
             }
 
     @classmethod
-    def circle_poly(cls, circle: Circle, poly: Polygon) -> dict:
+    def circle_poly(cls, circle: 'Circle', poly: 'Polygon') -> dict:
 
         test_distance = -1
         closest_vector = None
@@ -437,7 +457,7 @@ class Shape(object):
         }
 
     @classmethod
-    def circle_circle(cls, circle1: Circle, circle2: Circle) -> dict:
+    def circle_circle(cls, circle1: 'Circle', circle2: 'Circle') -> dict:
         rads = circle1.radius + circle2.radius
         vec = circle1.position - circle2.position
 
@@ -450,7 +470,11 @@ class Shape(object):
             SAT.sep_axis: vec.scale(diff),
         }
 
-    def update(self) -> None:
+    @property
+    def shape(self) -> type:
+        return Shape
+
+    def update(self, view: 'View') -> None:
         pass
 
     def rotate(self, angle: float) -> 'self':
@@ -471,15 +495,24 @@ class Polygon(Shape):
         self.scale = scale
         self.refpoints = refpoints
         self.points = [Vector(*point) for point in refpoints]
-        self.update()
+        self.draw_points = [v.ixy for v in self.points]
+        #self.update()
 
-    def update(self) -> None:
+    def update(self, view: 'View') -> None:
         """Performs rotation and scaling on points."""
         rad = math.radians(self.rotation)
         cos = math.cos(rad)
         sin = math.sin(rad)
         for i, point in enumerate(self.refpoints):
-            self.points[i].fast_rotated(point, cos, sin).rescale(self.scale)
+            self.points[i].rescaled(point, self.scale).fast_rotate(cos, sin)
+            self.draw_points[i] = (
+                (self.position.x + self.points[i].x) - view.position.x,
+                (self.position.y + self.points[i].y) - view.position.y
+            )
+
+    @property
+    def shape(self) -> type:
+        return Polygon
 
     def rotate(self, angle: float) -> 'self':
         self.rotation = (self.rotation + angle) % 360.0
@@ -494,11 +527,22 @@ class Polygon(Shape):
 
     def collide_with(self, other: Shape) -> dict:
 
-        result = {
-            Polygon: Polygon.poly_poly(self, other),
-            Circle: Polygon.circle_poly(other, self)
-        }
-        return result.get(other.__class__, SAT_NO_COLLISION)
+        #print("self:{} as {}, other:{} as {}".format(self.__class__.__name__, self.shape, other.__class__.__name__, other.shape))
+        if other.shape is Polygon:
+            return Polygon.poly_poly(self, other)
+        elif other.shape is Circle:
+            return Circle.circle_poly(other, self)
+        else:
+            raise TypeError("Not Circle nor Polygon...")
+        #result = {
+        #    Polygon: Polygon.poly_poly(self, other),
+        #    Circle: Polygon.circle_poly(other, self)
+        #}
+        #return result.get(other.shape, SAT_NO_COLLISION)
+
+    def default_render(self, surface: pygame.Surface, view: 'View') -> None:
+        pygame.draw.polygon(surface, (127, 127, 0), self.draw_points)
+        pygame.draw.aalines(surface, (255, 255, 0), True, self.draw_points)
 
 
 class Circle(Shape):
@@ -506,6 +550,10 @@ class Circle(Shape):
     def __init__(self, position: Vector, rad: float):
         self.position = position
         self.radius = rad
+
+    @property
+    def shape(self) -> type:
+        return Circle
 
     def rotate(self, angle: float) -> 'self':
         return self
@@ -524,3 +572,8 @@ class Circle(Shape):
             Circle: Polygon.circle_circle(self, other)
         }
         return result.get(other.__class__, SAT_NO_COLLISION)
+
+    def default_render(self, surface: pygame.Surface, view: 'View'):
+        pos = self.position - view.position
+        rad = int(self.radius)
+        pygame.gfxdraw.aacircle(surface, pos.ix, pos.iy, rad, (255, 255, 0))

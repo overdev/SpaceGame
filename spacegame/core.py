@@ -22,7 +22,7 @@ class Game(object):
 
     """The game launcher."""
 
-    #scene = None
+    scene = None
 
     @classmethod
     def goto(cls, scene) -> None:

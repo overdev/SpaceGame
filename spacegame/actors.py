@@ -10,6 +10,8 @@ from spacegame.ui import Anchor
 
 __all__ = [
     "Actor",
+    "Room",
+    "View"
 ]
 
 
@@ -115,6 +117,12 @@ class Actor(Polygon):
         """Called when the mouse wheel rolls down."""
         pass
 
+    def on_enter_view(self, view: 'View', game: type) -> None:
+        """Called when the object gets partially or totally inside the view area."""
+
+    def on_leave_view(self, view: 'View', game: type) -> None:
+        """Called when the object get totally outside the view area."""
+
     def on_command(self, game) -> None:
         """Called when the this object's keyboard command is entered."""
         pass
@@ -125,7 +133,7 @@ class View(Polygon):
     refpoints = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
     transition = Path1d([0.75 ** i for i in range(20)])
 
-    def __init__(self, room: Room):
+    def __init__(self, room: 'Room'):
         super(View, self).__init__(Vector.zero(), 0.0, Vector(*self.size), View.refpoints)
         self.room = room
         self.anchor = Anchor.top_left
@@ -135,7 +143,6 @@ class View(Polygon):
     @property
     def size(self) -> tuple:
         return pygame.display.get_surface().get_size()
-
 
     @property
     def display(self) -> tuple:
@@ -171,16 +178,19 @@ class View(Polygon):
 
         # check for animations
         for name in self.__dict__:
-            if name in self.paths:
-                pathstate = self.paths[name]
-                if pathstate.is_animating:
-                    ended = pathstate.animate()
-                    if pathstate.asgnmode is AssignMode.direct_value:
-                        setattr(self, name, pathstate.position)
-                    elif pathstate.asgnmode is AssignMode.vector_updt:
-                        getattr(self, name).xy = pathstate.position
-                    if ended:
-                        self.on_animation_end(name, pathstate, game)
+            if name not in self.paths:
+                continue
+
+            pathstate = self.paths[name]
+
+            if pathstate.is_animating:
+                ended = pathstate.animate()
+                if pathstate.asgnmode is AssignMode.direct_value:
+                    setattr(self, name, pathstate.position)
+                elif pathstate.asgnmode is AssignMode.vector_updt:
+                    getattr(self, name).xy = pathstate.position
+                if ended:
+                    self.on_animation_end(name, pathstate, game)
 
     def on_animation_end(self, attr: str, pathstate: PathState, game: type):
         pass
@@ -190,6 +200,7 @@ class Room(object):
 
     def __init__(self, actors: list):
         self.actors = []
+        self.visible = []
         self.minimum = Vector.zero()
         self.maximum = Vector.one()
         self.view = View(self)
@@ -198,19 +209,19 @@ class Room(object):
     def add_actors(self, actors: list) -> None:
         for actor in actors:
             if actor not in self.actors:
-                self.actors.append(actors)
+                self.actors.append(actor)
 
     def clear(self) -> None:
         del self.actors[:]
 
-    def update(self, game: type) -> None:
+    def update(self, view: 'View', game: type) -> None:
         """Updates all objects."""
         indices = range(len(self.actors))
         # motion
         self.view.animate(game)
         for i in indices:
             self.actors[i].animate(game)
-            self.actors[i].update()
+            self.actors[i].update(view)
         # collision
         for j in indices:
             a = self.actors[j]
@@ -226,8 +237,11 @@ class Room(object):
         for actor in self.actors:
             info = self.view.collide_with(actor)
             if info[SAT.overlapped]:
-                actor.visible = True
+                if actor not in self.visible:
+                    self.visible.append(actor)
+                    actor.on_enter_view(self.view, game)
+            else:
+                if actor in self.visible:
+                    self.visible.remove(actor)
+                    actor.on_leave_view(self.view, game)
 
-    def collision_check(self, a: Actor, b: Actor) -> None or tuple:
-        """Check collision between two actors."""
-        return None
