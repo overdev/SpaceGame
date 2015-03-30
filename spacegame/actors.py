@@ -2,6 +2,7 @@ __author__ = 'Jorge'
 
 
 import pygame
+import pygame.locals as c
 from spacegame.geometry import *
 from spacegame.vectors import Vector
 from spacegame.assets import *
@@ -97,11 +98,7 @@ class Actor(Polygon):
         """Called when the middle mouse button is pressed."""
         pass
 
-    def on_client_enter(self, game) -> None:
-        """Called when the mouse moves."""
-        pass
-
-    def on_client_move(self, screen, game) -> None:
+    def on_mouse_move(self, room_pos:Vector, view_pos: Vector, motion: Vector, game: type) -> None:
         """Called when the mouse moves over this object."""
         pass
 
@@ -123,7 +120,7 @@ class Actor(Polygon):
     def on_leave_view(self, view: 'View', game: type) -> None:
         """Called when the object get totally outside the view area."""
 
-    def on_command(self, game) -> None:
+    def on_command(self, cmd: tuple, game: type) -> None:
         """Called when the this object's keyboard command is entered."""
         pass
 
@@ -143,6 +140,14 @@ class View(Polygon):
     @property
     def size(self) -> tuple:
         return pygame.display.get_surface().get_size()
+
+    def rel_point(self, point: tuple) -> Vector:
+        x, y = self.position
+        return Vector(point[0] - x, point[1] - y)
+
+    def abs_point(self, point: tuple) -> Vector:
+        x, y = self.position
+        return Vector(point[0] + x, point[1] + y)
 
     @property
     def display(self) -> tuple:
@@ -198,6 +203,32 @@ class View(Polygon):
 
 class Room(object):
 
+    @classmethod
+    def get_command(cls, event) -> tuple or None:
+        if event.type == c.KEYDOWN:
+            ctrl = event.mod & c.KMOD_LCTRL or event.mod & c.KMOD_RCTRL
+            alt = event.mod & c.KMOD_LALT or event.mod & c.KMOD_RALT
+            shift = event.mod & c.KMOD_LSHIFT or event.mod & c.KMOD_RSHIFT
+
+            if ctrl:
+                if alt:
+                    return c.K_LCTRL, c.K_LALT, event.key
+                elif shift:
+                    return c.K_LCTRL, c.K_LSHIFT, event.key
+                else:
+                    return c.K_LCTRL, event.key
+            elif alt:
+                if shift:
+                    return c.K_LALT, c.K_LSHIFT, event.key
+                else:
+                    return c.K_LALT, event.key
+            elif shift:
+                return c.K_LSHIFT, event.key
+            else:
+                return (event.key,)
+
+        return None
+
     def __init__(self, actors: list):
         self.actors = []
         self.visible = []
@@ -214,14 +245,31 @@ class Room(object):
     def clear(self) -> None:
         del self.actors[:]
 
-    def update(self, view: 'View', game: type) -> None:
+    def update(self, events: list, keys: tuple, view: 'View', game: type) -> None:
         """Updates all objects."""
         indices = range(len(self.actors))
+
+        # events
+        for event in events:
+            if event.type == c.KEYDOWN:
+                cmd = Room.get_command(event)
+                for i in indices:
+                    self.actors[i].on_command(cmd, game)
+
+            elif event.type == c.MOUSEMOTION:
+                rpos = Vector(*event.pos)
+                apos = self.view.abs_point(event.pos)
+                rel = Vector(*event.rel)
+                for i in indices:
+                    self.actors[i].on_mouse_move(apos, rpos, rel, game)
+
         # motion
         self.view.animate(game)
         for i in indices:
+            self.actors[i].on_keydown(keys, game)
             self.actors[i].animate(game)
             self.actors[i].update(view)
+
         # collision
         for j in indices:
             a = self.actors[j]

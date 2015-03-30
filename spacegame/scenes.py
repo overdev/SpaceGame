@@ -55,7 +55,8 @@ class SceneMain(Scene):
 
         while game.scene is cls:
             events = pygame.event.get()
-            dispatcher.process_events(events, game)
+            keys = pygame.key.get_pressed()
+            dispatcher.process_events(events, keys, game)
 
             Display.clear(fillcolor)
             surface = Display.surface()
@@ -99,7 +100,8 @@ class SceneOption(Scene):
 
         while game.scene is cls:
             events = pygame.event.get()
-            dispatcher.process_events(events, game)
+            keys = pygame.key.get_pressed()
+            dispatcher.process_events(events, keys, game)
 
             Display.clear(fillcolor)
             surface = Display.surface()
@@ -127,6 +129,18 @@ class SceneGame(Scene):
             """Back to previous scene."""
             game.scene = SceneMain
 
+    class Trigon(Actor):
+
+        points = [(-0.5, 0.6), (0.5, 0.6), (0.0, -0.4)]
+
+        def __init__(self, position: Vector, rotation: float, scale: Vector):
+            super(SceneGame.Trigon, self).__init__(SceneGame.Trigon.points)
+            self.position = position
+            self.rotation = rotation
+            self.scale = scale
+
+        def on_client_move(self, screen: tuple, game: type):
+            pass
 
     @classmethod
     def play(cls, game: type) -> None:
@@ -143,12 +157,21 @@ class SceneGame(Scene):
             'scale',
             Path2d(
                 [
-                    (0, 0), (50, 10), (10, 50), (100, 100), (0, 0)
+                    (80, 80), (100, 100), (80, 80)
                 ],
                 False
             ),
             AssignMode.vector_updt,
             -1)
+        sq.set_path(
+            'fillcolor',
+            PathTone(
+                [(0, 0, 255), (255, 0, 16), (0, 0, 255)]
+            ),
+            AssignMode.direct_value,
+            -1
+        )
+        sq.paths['fillcolor'].set_animation(60, 5)
         # sq.paths['rotation'].set_animation(repeats=1)
         room = Room(
             [
@@ -161,8 +184,9 @@ class SceneGame(Scene):
 
         while game.scene is cls:
             events = pygame.event.get()
-            dispatcher.process_events(events, game)
-            room.update(room.view, game)
+            keys = pygame.key.get_pressed()
+            dispatcher.process_events(events, keys, game)
+            room.update(events, keys, room.view, game)
 
             Display.clear(fillcolor)
             surface = Display.surface()

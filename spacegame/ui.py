@@ -332,7 +332,7 @@ class Dispatcher(object):
         e = pygame.event.Event(c.MOUSEMOTION, {'pos': pos, 'rel': rel, 'buttons': (False, False, False)})
         pygame.event.post(e)
 
-    def process_events(self, events, game) -> None:
+    def process_events(self, events: list, keys: tuple, game: type) -> None:
 
         for event in events:
             if event.type == c.QUIT:
@@ -368,7 +368,6 @@ class Dispatcher(object):
                         5: listener.on_roll_down
                     }[event.button](listener.inner_point(event.pos), game)
 
-        keys = pygame.key.get_pressed()
         for listener in self.listeners:
             if listener.active:
                 listener.on_keydown(keys, game)

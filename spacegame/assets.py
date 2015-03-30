@@ -7,6 +7,7 @@ import pygame.gfxdraw
 import math
 from spacegame.geometry import *
 from spacegame.vectors import Vector
+from spacegame.ui import blend_color
 # from spacegame.core import resource
 
 __all__ = [
@@ -17,6 +18,7 @@ __all__ = [
     "Path",
     "Path1d",
     "Path2d",
+    "PathTone",
     "PathCircle",
     "Parallax",
     "Polygon",
@@ -33,9 +35,10 @@ class AssignMode(Enum):
 class SAT(Enum):
     overlapped = 0
     sep_axis = 1
+    face_normal = 2
 
 
-SAT_NO_COLLISION = {SAT.overlapped: False, SAT.sep_axis: None}
+SAT_NO_COLLISION = {SAT.overlapped: False, SAT.sep_axis: None, SAT.face_normal: None}
 
 
 class Path(object):
@@ -209,6 +212,59 @@ class Path2d(Path):
         return length / self.length
 
 
+class PathTone(Path):
+
+    __slots__ = ("values",)
+
+    @staticmethod
+    def lerp_color(a, b, r):
+        pass
+
+    def __init__(self, colors: list):
+        self.values = colors # A list of RGB tuples
+
+    @property
+    def length(self) -> float:
+        """Gets the length of this path."""
+        if len(self.values) in (0, 1):
+            return 0.0
+
+        return float(len(self.values))
+
+    def get_position(self, ratio: float) -> tuple:
+        """Returns a position in the path relative to the ratio of its length."""
+
+        if len(self.values) == 0:
+            raise ValueError("Path contains no values.")
+
+        if len(self.values) == 1:
+            return self.values[0]
+
+        if ratio == 0.0:
+            return self.values[0]
+
+        if ratio == 1.0:
+            return self.values[-1]
+
+        ratio %= 1.0
+        limit = ratio * self.length
+        i, r = divmod(limit, 1)
+        i = int(i)
+        return blend_color(self.values[i], self.values[(i + 1) % len(self.values)], (r, r, r))
+
+    def get_length(self, ratio: float) -> float:
+        """Returns a path length relative to given ratio."""
+        ratio %= 1.0
+
+        return (1 / self.length) * ratio
+
+    def get_ratio(self, length: float) -> float:
+        """Returns a value between 0 and 1 ralative to given length and this path's length."""
+        length %= self.length
+
+        return length / self.length
+
+
 class PathCircle(Path):
 
     __slots__ = ("position", "radius", "clockwise")
@@ -326,6 +382,10 @@ class Parallax(object):
 
 class Shape(object):
 
+    def __init__(self):
+        self.linecolor = (255, 255, 255)
+        self.fillcolor = (192, 192, 192)
+
     @staticmethod
     def find_normal_axis(vertices: list, index: int) -> Vector:
         vector1 = vertices[index]
@@ -379,7 +439,8 @@ class Shape(object):
 
             return {
                 SAT.overlapped: True,
-                SAT.sep_axis: Vector(axis.x * (max2 - min1) * -1, axis.y * (max2 - min1) * -1)
+                SAT.sep_axis: Vector(axis.x * (max2 - min1) * -1, axis.y * (max2 - min1) * -1),
+                SAT.face_normal: axis
             }
 
     @classmethod
@@ -454,6 +515,7 @@ class Shape(object):
         return {
             SAT.overlapped: True,
             SAT.sep_axis: Vector(normal_axis.x * (max2 - min1) * -1, normal_axis.y * (max2 - min1) * -1),
+            SAT.face_normal: normal_axis
         }
 
     @classmethod
@@ -468,6 +530,7 @@ class Shape(object):
         return {
             SAT.overlapped: True,
             SAT.sep_axis: vec.scale(diff),
+            SAT.face_normal: vec.normalized
         }
 
     @property
@@ -490,6 +553,7 @@ class Shape(object):
 class Polygon(Shape):
 
     def __init__(self, position: Vector, rotation: float, scale: Vector, refpoints: list):
+        super(Polygon, self).__init__()
         self.position = position
         self.rotation = rotation
         self.scale = scale
@@ -541,13 +605,14 @@ class Polygon(Shape):
         #return result.get(other.shape, SAT_NO_COLLISION)
 
     def default_render(self, surface: pygame.Surface, view: 'View') -> None:
-        pygame.draw.polygon(surface, (127, 127, 0), self.draw_points)
-        pygame.draw.aalines(surface, (255, 255, 0), True, self.draw_points)
+        pygame.draw.polygon(surface, self.fillcolor, self.draw_points)
+        pygame.draw.aalines(surface, self.linecolor, True, self.draw_points)
 
 
 class Circle(Shape):
 
     def __init__(self, position: Vector, rad: float):
+        super(Circle, self).__init__()
         self.position = position
         self.radius = rad
 
@@ -576,4 +641,5 @@ class Circle(Shape):
     def default_render(self, surface: pygame.Surface, view: 'View'):
         pos = self.position - view.position
         rad = int(self.radius)
-        pygame.gfxdraw.aacircle(surface, pos.ix, pos.iy, rad, (255, 255, 0))
+        pygame.gfxdraw.filled_circle(surface, pos.ix, pos.iy, rad, self.fillcolor)
+        pygame.gfxdraw.aacircle(surface, pos.ix, pos.iy, rad, self.linecolor)

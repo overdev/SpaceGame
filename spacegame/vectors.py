@@ -93,12 +93,20 @@ class Vector(object):
         return self
 
     def __mul__(self, other):
+        if isinstance(other, (int, float)):
+            return Vector(self.x * other, self.y * other)
         return Vector(self.x * other[0], self.y * other[1])
 
     def __rmul__(self, other):
+        if isinstance(other, (int, float)):
+            return Vector(self.x * other, self.y * other)
         return Vector(other[0] * self.x, other[1] * self.y)
 
     def __imul__(self, other):
+        if isinstance(other, (int, float)):
+            self.x *= other
+            self.y *= other
+            return self
         self.x *= other[0]
         self.y *= other[1]
         return self
@@ -302,6 +310,14 @@ class Vector(object):
         dotp = self.dot(other)
         scalar = dotp / mag
         return Vector(other[0] * scalar, other[1] * scalar)
+
+    def reflect(self, normal) -> 'Vector':
+        """Returns the reflection of this vector inciding on line with given normal."""
+        # r = i - (2 * n * dot(i, n))
+        i = self
+        n = normal
+        r = i - (2 * n * i.dot(n))
+        return r
 
     def interpolate(self, other, ratio) -> 'Vector':
         """Returns the linar interpolation between this and onther vector."""
