@@ -6,7 +6,8 @@ import pygame.locals as c
 from spacegame.geometry import *
 from spacegame.vectors import Vector
 from spacegame.assets import *
-from spacegame.ui import Anchor
+from spacegame.ui import Anchor, BitmapFont
+from spacegame.core import resource
 
 
 __all__ = [
@@ -75,53 +76,61 @@ class Actor(Polygon):
         """Called in the instance creation."""
         pass
 
-    def on_animation_end(self, attr: str, pathstate: PathState, game: type):
+    def on_animation_end(self, attr: str, pathstate: PathState, game: type, room: 'Room'):
         """Called when the animation for the attribute reaches the last step."""
 
-    def on_collision(self, other: 'Actor', info: dict, game: type):
+    def on_collision(self, other: 'Actor', info: dict, game: type, room: 'Room'):
         """Called when this object collides with other."""
         pass
 
-    def on_keydown(self, keys: tuple, game: type) -> None:
+    def on_keydown(self, keys: tuple, game: type, room: 'Room') -> None:
         """Called whenever a keyboard key is down."""
         pass
 
-    def on_left_click(self, screen: tuple, game: type) -> None:
+    def on_keyup(self, key: int, game: type, room: 'Room') -> None:
+        """Called whenever a keyboard key is released."""
+        pass
+
+    def on_left_click(self, inroom: Vector, inview: Vector, game: type, room: 'Room') -> None:
         """Called when the left mouse button is pressed."""
         pass
 
-    def on_right_click(self, screen, game) -> None:
+    def on_right_click(self, inroom: Vector, inview: Vector, game: type, room: 'Room') -> None:
         """Called when the right mouse button is pressed."""
         pass
 
-    def on_middle_click(self, screen, game) -> None:
+    def on_middle_click(self, inroom: Vector, inview: Vector, game: type, room: 'Room') -> None:
         """Called when the middle mouse button is pressed."""
         pass
 
-    def on_mouse_move(self, room_pos:Vector, view_pos: Vector, motion: Vector, game: type) -> None:
+    def on_mouse_move(self, inroom: Vector, inview: Vector, motion: Vector, game: type, room: 'Room') -> None:
         """Called when the mouse moves over this object."""
         pass
 
-    def on_client_exit(self, game) -> None:
+    def on_client_exit(self, game: type, room: 'Room') -> None:
         """Called when the mouse moves out this object."""
         pass
 
-    def on_roll_up(self, client, game) -> None:
+    def on_roll_up(self, inroom: Vector, inview: Vector, game: type, room: 'Room') -> None:
         """Called when the mouse wheel rolls up."""
         pass
 
-    def on_roll_down(self, client, game) -> None:
+    def on_roll_down(self, inroom: Vector, inview: Vector, game: type, room: 'Room') -> None:
         """Called when the mouse wheel rolls down."""
         pass
 
-    def on_enter_view(self, view: 'View', game: type) -> None:
+    def on_enter_view(self, view: 'View', game: type, room: 'Room') -> None:
         """Called when the object gets partially or totally inside the view area."""
 
-    def on_leave_view(self, view: 'View', game: type) -> None:
+    def on_leave_view(self, view: 'View', game: type, room: 'Room') -> None:
         """Called when the object get totally outside the view area."""
 
-    def on_command(self, cmd: tuple, game: type) -> None:
+    def on_command(self, cmd: tuple, game: type, room: 'Room') -> None:
         """Called when the this object's keyboard command is entered."""
+        pass
+
+    def on_prerender(self, game: type, room: 'Room') -> None:
+        """Called right before the frame rendering."""
         pass
 
 
@@ -129,13 +138,19 @@ class View(Polygon):
 
     refpoints = [(0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)]
     transition = Path1d([0.75 ** i for i in range(20)])
+    starfield = pygame.image.load(resource("starfield.png"))
 
     def __init__(self, room: 'Room'):
         super(View, self).__init__(Vector.zero(), 0.0, Vector(*self.size), View.refpoints)
+        self.motion = Vector.zero()
         self.room = room
         self.anchor = Anchor.top_left
         self.paths = {}
         self.set_path('transition', View.transition, AssignMode.direct_value, 0)
+        self.parallaxes = [
+            BackScroller(View.starfield, self.size, [77, 14]),
+            BackScroller(View.starfield, self.size, [28, 56]),
+        ]
 
     @property
     def size(self) -> tuple:
@@ -153,9 +168,24 @@ class View(Polygon):
     def display(self) -> tuple:
         w, h = self.size
         return (
-            (0, 0), (0, w),
-            (h, w), (h, 0)
+            (0, 0), (0, h),
+            (w, h), (w, 0)
         )
+
+    def follow(self, position: Vector, anchor:  Anchor=Anchor.middle) -> None:
+        w, h = self.size
+        offs = {
+            Anchor.top_left: (0, 0),
+            Anchor.top: (w / 2, 0),
+            Anchor.top_right: (w, 0),
+            Anchor.middle_left: (0, h / 2),
+            Anchor.middle: (w / 2, h / 2),
+            Anchor.middle_right: (w, h / 2),
+            Anchor.bottom_left: (0, h),
+            Anchor.bottom: (w / 2, h),
+            Anchor.bottom_right: (w, h)
+        }.get(anchor, (w / 2, h / 2))
+        self.position.xy = position - offs
 
     def set_path(self, attribute: str, path: Path, asgnmode: AssignMode, repeats: int=-1, ratio: float=0.0) -> None:
         """Adds or removes a animation path for an attribute."""
@@ -180,7 +210,7 @@ class View(Polygon):
 
     def animate(self, game: type) -> None:
         """Updates animation attributes."""
-
+        motion = self.motion * 1.0
         # check for animations
         for name in self.__dict__:
             if name not in self.paths:
@@ -195,10 +225,18 @@ class View(Polygon):
                 elif pathstate.asgnmode is AssignMode.vector_updt:
                     getattr(self, name).xy = pathstate.position
                 if ended:
-                    self.on_animation_end(name, pathstate, game)
+                    self.on_animation_end(name, pathstate, game, self.room)
 
-    def on_animation_end(self, attr: str, pathstate: PathState, game: type):
+        for parallax in self.parallaxes:
+            motion *= 0.75
+            parallax.update(motion)
+
+    def on_animation_end(self, attr: str, pathstate: PathState, game: type, room: 'Room'):
         pass
+
+    def render(self, surface: pygame.Surface) -> None:
+        for parallax in self.parallaxes:
+            parallax.render(surface, c.BLEND_ADD)
 
 
 class Room(object):
@@ -254,19 +292,35 @@ class Room(object):
             if event.type == c.KEYDOWN:
                 cmd = Room.get_command(event)
                 for i in indices:
-                    self.actors[i].on_command(cmd, game)
+                    self.actors[i].on_command(cmd, game, self)
+
+            elif event.type == c.KEYUP:
+                for i in indices:
+                    self.actors[i].on_keyup(event.key, game, self)
 
             elif event.type == c.MOUSEMOTION:
                 rpos = Vector(*event.pos)
                 apos = self.view.abs_point(event.pos)
                 rel = Vector(*event.rel)
                 for i in indices:
-                    self.actors[i].on_mouse_move(apos, rpos, rel, game)
+                    self.actors[i].on_mouse_move(apos, rpos, rel, game, self)
+
+            elif event.type == c.MOUSEBUTTONDOWN:
+                rpos = Vector(*event.pos)
+                apos = self.view.abs_point(event.pos)
+                for i in indices:
+                    {
+                        1: self.actors[i].on_left_click,
+                        2: self.actors[i].on_middle_click,
+                        3: self.actors[i].on_right_click,
+                        4: self.actors[i].on_roll_up,
+                        5: self.actors[i].on_roll_down,
+                    }[event.button](apos, rpos, game, self)
 
         # motion
         self.view.animate(game)
         for i in indices:
-            self.actors[i].on_keydown(keys, game)
+            self.actors[i].on_keydown(keys, game, self)
             self.actors[i].animate(game)
             self.actors[i].update(view)
 
@@ -276,10 +330,18 @@ class Room(object):
             for k in indices[j + 1:]:
                 b = self.actors[k]
 
-                info = a.collides_with(b)
+                info = a.collide_with(b)
+                BitmapFont.set_colors(BitmapFont.small, (0, 0, 0), (255, 255, 255))
+                BitmapFont.render(
+                    pygame.display.get_surface(),
+                    "{}".format(list(info.values())),
+                    BitmapFont.small,
+                    Vector(0, 300)
+                )
+
                 if info[SAT.overlapped]:
-                    a.on_collision(b, info, game)
-                    b.on_collision(a, info, game)
+                    a.on_collision(b, info, game, self)
+                    b.on_collision(a, info, game, self)
 
         # select visible
         for actor in self.actors:
@@ -287,9 +349,11 @@ class Room(object):
             if info[SAT.overlapped]:
                 if actor not in self.visible:
                     self.visible.append(actor)
-                    actor.on_enter_view(self.view, game)
+                    actor.on_enter_view(self.view, game, self)
             else:
                 if actor in self.visible:
                     self.visible.remove(actor)
-                    actor.on_leave_view(self.view, game)
+                    actor.on_leave_view(self.view, game, self)
 
+        for actor in self.actors:
+            actor.on_prerender(game, self)

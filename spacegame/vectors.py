@@ -56,7 +56,7 @@ class Vector(object):
         self.y = y
 
     def __str__(self) -> str:
-        return "({:.3f}, {:.3f})".format(self.x, self.y)
+        return "({:.4f}, {:.4f})".format(self.x, self.y)
 
     def __repr__(self) -> str:
         return "{}({}, {})".format(self.__class__.__qualname__, self.x, self.y)
@@ -85,7 +85,7 @@ class Vector(object):
         return Vector(self.x - other[0], self.y - other[1])
 
     def __rsub__(self, other):
-        return Vector(other[0] - self.x, other[1] - self.y)
+        return Vector(self.x - other[0], self.y - other[1])
 
     def __isub__(self, other):
         self.x -= other[0]
@@ -252,27 +252,47 @@ class Vector(object):
 
         return self
 
+    def perpend_left(self) -> 'self':
+        x, y = self
+        self.x = -y
+        self.y = x
+
+        return self
+
+    def perpend_right(self) -> 'self':
+        x, y = self
+        self.x = y
+        self.y = -x
+
+        return self
+
     def rotate(self, angle) -> 'self':
         """Rotates this vector by a given angle."""
         rad = math.radians(angle)
         cos = math.cos(rad)
         sin = math.sin(rad)
         x, y = self
-        self.x = cos * x - sin * y
+        self.x = -(cos * x - sin * y)
         self.y = sin * x + cos * y
+
+        return self
+
+    def translated(self, motion: 'Vector') -> 'self':
+        self.x += motion[0]
+        self.y += motion[1]
 
         return self
 
     def fast_rotate(self, cos, sin) -> 'self':
         x, y = self
-        self.x = cos * x - sin * y
+        self.x = -(cos * x - sin * y)
         self.y = sin * x + cos * y
 
         return self
 
-    def fast_rotated(self, other: object, cos, sin):
+    def fast_rotated(self, other: object, cos, sin) -> 'self':
         x, y = other
-        self.x = cos * x - sin * y
+        self.x = -(cos * x - sin * y)
         self.y = sin * x + cos * y
 
         return self
@@ -318,6 +338,9 @@ class Vector(object):
         n = normal
         r = i - (2 * n * i.dot(n))
         return r
+
+    def negate(self) -> 'Vector':
+        return Vector(-self.x, -self.y)
 
     def interpolate(self, other, ratio) -> 'Vector':
         """Returns the linar interpolation between this and onther vector."""

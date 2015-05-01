@@ -6,6 +6,15 @@ from collections import namedtuple
 
 
 __all__ = [
+    "dot",
+    "cross",
+    "hypot",
+    "angle",
+    "length",
+    "normalize",
+    "perpend_left",
+    "perpend_right",
+    "negate",
     "radius",
     "diameter",
     "circunference",
@@ -37,6 +46,34 @@ def hypot(a) -> float:
     return (a[0] ** 2) + (a[1] ** 2)
 
 
+def angle(a) -> float:
+        """Returns the angle of this vector."""
+        return math.degrees(math.atan2(a[1], a[0]))
+
+
+def length(a) -> float:
+    return math.sqrt(hypot(a))
+
+
+def normalize(a) -> tuple:
+    mag = length(a)
+    if mag != 0:
+        return a[0]/mag, a[1]/mag
+    return 0.0, 0.0
+
+
+def perpend_left(a):
+    return -(a[1]), a[0]
+
+
+def perpend_right(a):
+    return a[1], -(a[0])
+
+
+def negate(a):
+    return a[0]*(-1), a[1]*(-1)
+
+
 def radius(circunf) -> float:
     """Returns the radius of a circle with given surface length."""
     return (circunf / math.pi) / 2
@@ -52,7 +89,7 @@ def circunference(rad) -> float:
     return 2 * math.pi * rad
 
 
-def lengthdir(angle, length) -> tuple:
+def lengthdir(length: float, angle: float) -> tuple:
     """Returns a point at given angle and offset."""
     r = math.radians(angle)
     return math.cos(r) * length, math.sin(r) * length

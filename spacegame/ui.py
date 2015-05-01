@@ -301,6 +301,9 @@ class UIElement(object):
         """Called when the this object's keyboard command is entered."""
         pass
 
+    def on_text(self, char: str, game: type):
+        """Called when a printable character is pressed in the keyboard."""
+
     def basic_render(self, surface) -> None:
         """Displays this object with default rendering"""
         if not self.visible:
@@ -342,6 +345,9 @@ class Dispatcher(object):
                 for listener in self.listeners:
                     if listener.responds_to(cmd):
                         listener.on_command(game)
+
+                    if event.unicode != "":
+                        listener.on_text(event.unicode, game)
 
             elif event.type == c.MOUSEMOTION:
                 for listener in self.listeners:

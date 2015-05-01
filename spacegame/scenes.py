@@ -4,12 +4,15 @@ __author__ = 'Jorge A. Gomes'
 from spacegame.ui import Dispatcher
 from spacegame.ui import Button
 from spacegame.ui import BitmapFont
+from spacegame.ui import Anchor
 from spacegame.geometry import *
 from spacegame.core import Scene
 from spacegame.core import Display
+from spacegame.core import resource
 from spacegame.assets import *
 from spacegame.actors import *
 from spacegame.vectors import Vector
+import random
 import pygame
 import pygame.locals as c
 
@@ -115,84 +118,60 @@ class SceneOption(Scene):
 
 class SceneGame(Scene):
 
-    class Square(Actor):
+    class Starship(Actor):
 
-        points = [(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)]
-
-        def __init__(self, position: Vector, rotation: float, scale: Vector):
-            super(SceneGame.Square, self).__init__(SceneGame.Square.points)
-            self.position = position
-            self.rotation = rotation
-            self.scale = scale
-
-        def on_animation_end(self, attr: str, pathstate: PathState, game: type) -> None:
-            """Back to previous scene."""
-            game.scene = SceneMain
-
-    class Trigon(Actor):
-
-        points = [(-0.5, 0.6), (0.5, 0.6), (0.0, -0.4)]
+        refpoints = [(0.5, 0.0), (0.4, 0.2), (-0.3, 0.5), (-0.3, 0.3), (-0.5, 0.0),
+            (-0.3, -0.3), (-0.3, -0.5), (0.4, -0.2)]
 
         def __init__(self, position: Vector, rotation: float, scale: Vector):
-            super(SceneGame.Trigon, self).__init__(SceneGame.Trigon.points)
-            self.position = position
+            super(SceneGame.Starship, self).__init__(SceneGame.Starship.refpoints)
+            self.position.xy = position
             self.rotation = rotation
-            self.scale = scale
+            self.scale.xy = scale
+            self.fillcolor = (0, 0, 255)
+            self.linecolor = (64, 64, 255)
 
-        def on_client_move(self, screen: tuple, game: type):
-            pass
+        def on_keydown(self, keys: tuple, game: type, room: Room) -> None:
+            if keys[c.K_w]:
+                self.motion_add(0.1, self.rotation)
+            if keys[c.K_a]:
+                self.rotation = (self.rotation + 4) % 360
+            if keys[c.K_d]:
+                self.rotation = (self.rotation - 4) % 360
+
+            room.view.motion = self.motion
+
+        def on_prerender(self, game: type, room: 'Room') -> None:
+            room.view.follow(self.position)
 
     @classmethod
     def play(cls, game: type) -> None:
 
         dispatcher = Dispatcher(
             [
-                SceneOption.BackButton(Vec(100, 100), Vec(100, 40), "Back", None)
+                SceneOption.BackButton(Vec(100, 540), Vec(100, 40), "Back", None)
             ]
         )
+        room = Room([
+            cls.Starship(Vector(300, 200), 0, Vector(50, 50))
+        ])
 
-        sq = cls.Square(Vector(50, 50), 0, Vector(20, 30))
-        # sq.set_path('rotation', Path1d([0, 180, 10, 30, 0], True), AssignMode.direct_value, -1)
-        sq.set_path(
-            'scale',
-            Path2d(
-                [
-                    (80, 80), (100, 100), (80, 80)
-                ],
-                False
-            ),
-            AssignMode.vector_updt,
-            -1)
-        sq.set_path(
-            'fillcolor',
-            PathTone(
-                [(0, 0, 255), (255, 0, 16), (0, 0, 255)]
-            ),
-            AssignMode.direct_value,
-            -1
-        )
-        sq.paths['fillcolor'].set_animation(60, 5)
-        # sq.paths['rotation'].set_animation(repeats=1)
-        room = Room(
-            [
-                sq
-            ]
-        )
         textcolor = (0, 0, 92)
         fillcolor = (0, 0, 16)
         BitmapFont.set_colors(BitmapFont.large, fillcolor, textcolor)
 
         while game.scene is cls:
+            Display.clear(fillcolor)
+            surface = Display.surface()
+
             events = pygame.event.get()
             keys = pygame.key.get_pressed()
             dispatcher.process_events(events, keys, game)
             room.update(events, keys, room.view, game)
 
-            Display.clear(fillcolor)
-            surface = Display.surface()
-
             BitmapFont.render(surface, "Game", BitmapFont.large, (0, 0))
 
+            room.view.render(surface)
             for actor in room.actors:
                 actor.default_render(surface, room.view)
 

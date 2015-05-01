@@ -8,6 +8,7 @@ import math
 from spacegame.geometry import *
 from spacegame.vectors import Vector
 from spacegame.ui import blend_color
+from spacegame.sat import *
 # from spacegame.core import resource
 
 __all__ = [
@@ -21,6 +22,7 @@ __all__ = [
     "PathTone",
     "PathCircle",
     "Parallax",
+    "BackScroller",
     "Polygon",
     "Circle"
 ]
@@ -370,43 +372,95 @@ class Parallax(object):
         self.scrollratio = scrollratio
         self.scrollpos = Vector.zero()
 
-    def scroll(self, position: Vector) -> None:
+    def scroll(self, position: Vector, view_size: Vector) -> None:
         self.scrollpos.xy = (position * self.scrollratio) % self.image.get_size()
 
     def render(self, surface: pygame.Surface, view: 'View') -> None:
         # NOTE: 'view' parameter refers to a spacegame.actors.View type of object.
         # View class is not present in this module namespace.
-        self.scroll(view.position)
+        #self.scroll(view.position)
         pygame.gfxdraw.textured_polygon(surface, view.display, self.image, self.scrollpos.ix, self.scrollpos.iy)
+
+
+class BackScroller(object):
+
+    def __init__(self, bgi: pygame.Surface, surface_size: tuple, view_position=(0, 0)):
+        self.back = bgi
+        self.view_w, self.view_h = surface_size
+        self.view_x, self.view_y = view_position
+        self.image_w, self.image_h = bgi.get_size()
+
+        self.origin_x = 0
+        self.origin_y = 0
+        self.widths = []
+        self.heights = []
+
+        self.update(Vector.zero())
+
+    def update(self, scroll_motion:Vector=None) -> None:
+        """
+        """
+
+        if scroll_motion is None:
+            return
+
+        del self.widths[:], self.heights[:]
+
+        self.view_x += scroll_motion[0]
+        self.view_y += scroll_motion[1]
+
+        self.origin_x = self.view_x % self.image_w
+        self.origin_y = self.view_y % self.image_h
+
+        x = -self.origin_x
+        while x < self.view_w:
+            w = min(self.image_w, self.view_w - x)
+            self.widths.append((x, w))
+            x += self.image_w
+
+        y = -self.origin_y
+        while y < self.view_h:
+            h = min(self.image_h, self.view_h - y)
+            self.heights.append((y, h))
+            y += self.image_h
+
+    def render(self, surface: pygame.Surface, blendmode: int=0) -> int:
+        i = 0
+        for y, h in self.heights:
+            for x, w in self.widths:
+                surface.blit(self.back, (x, y), [0, 0, w, h], blendmode)
+                i+=1
+        return i
 
 
 class Shape(object):
 
-    def __init__(self):
-        self.linecolor = (255, 255, 255)
-        self.fillcolor = (192, 192, 192)
-
     @staticmethod
     def find_normal_axis(vertices: list, index: int) -> Vector:
+        sz = len(vertices)
         vector1 = vertices[index]
-        vector2 = vertices[index - 1]
+        vector2 = vertices[(index + 1) % sz]
         return (vector2 - vector1).normalize().perpend()
 
     @classmethod
     def poly_poly(cls, poly1: 'Polygon', poly2: 'Polygon') -> dict:
         vectors1 = poly1.points
         vectors2 = poly2.points
-        if len(vectors1) == 2:
-            temp = (vectors1[1] - vectors1[0]).perpend()
-            round(temp)
-            vectors1.append(vectors1[1] + temp)
-        if len(vectors2) == 2:
-            temp = (vectors2[1] - vectors2[0]).perpend()
-            round(temp)
-            vectors2.append(vectors2[1] + temp)
 
+        # if len(vectors1) == 2:
+        #     temp = (vectors1[1] - vectors1[0]).perpend()
+        #     round(temp)
+        #     vectors1.append(vectors1[1] + temp)
+        # if len(vectors2) == 2:
+        #     temp = (vectors2[1] - vectors2[0]).perpend()
+        #     round(temp)
+        #     vectors2.append(vectors2[1] + temp)
+        """
         # find vertical offset
         vector_offset = poly1.position - poly2.position
+        interval = float('-inf')
+        smallest = None
+        result = SAT_NO_COLLISION
 
         # begin projection
         for i in range(len(vectors1)):
@@ -428,20 +482,39 @@ class Shape(object):
                 min2 = min(min2, med)
                 max2 = max(med, max2)
 
+            if min1 < min2:
+                local_interval = min2 - max1
+            else:
+                local_interval = min1 - max2
+
             offset = axis.dot(vector_offset)
             min1 += offset
             max1 += offset
 
             a = min1 - max2
             b = min2 - max1
+            local_interval = min(a, b)
             if a > 0 or b > 0:
-                return SAT_NO_COLLISION
+                result = SAT_NO_COLLISION
 
-            return {
-                SAT.overlapped: True,
-                SAT.sep_axis: Vector(axis.x * (max2 - min1) * -1, axis.y * (max2 - min1) * -1),
-                SAT.face_normal: axis
-            }
+            if local_interval < interval:
+                v = Vector(axis.x * (max2 - min1) * -1, axis.y * (max2 - min1) * -1)
+                interval = local_interval
+                result = {
+                    SAT.overlapped: True,
+                    SAT.sep_axis: v.length, #Vector(axis.x * (max2 - min1) * -1, axis.y * (max2 - min1) * -1),
+                    SAT.face_normal: axis #v.normalize()
+                }
+
+        """
+        r = get_separating_axis(vectors1, vectors2)
+        return {
+            SAT.overlapped: r[0],
+            SAT.face_normal: r[1],
+            SAT.sep_axis: r[2]
+        }
+
+        #return result
 
     @classmethod
     def circle_poly(cls, circle: 'Circle', poly: 'Polygon') -> dict:
@@ -533,6 +606,10 @@ class Shape(object):
             SAT.face_normal: vec.normalized
         }
 
+    def __init__(self):
+        self.linecolor = (255, 255, 255)
+        self.fillcolor = (192, 192, 192)
+
     @property
     def shape(self) -> type:
         return Shape
@@ -567,11 +644,13 @@ class Polygon(Shape):
         rad = math.radians(self.rotation)
         cos = math.cos(rad)
         sin = math.sin(rad)
-        for i, point in enumerate(self.refpoints):
-            self.points[i].rescaled(point, self.scale).fast_rotate(cos, sin)
+        for i in range(len(self.refpoints)):
+            self.points[i].rescaled(self.refpoints[i], self.scale).fast_rotate(cos, sin).translated(self.position)
+            #self.points[i].fast_rotate(cos, sin)
+            #self.draw_points[i] = self.points[i].ixy
             self.draw_points[i] = (
-                (self.position.x + self.points[i].x) - view.position.x,
-                (self.position.y + self.points[i].y) - view.position.y
+                self.points[i].x - view.position.x,
+                self.points[i].y - view.position.y
             )
 
     @property
